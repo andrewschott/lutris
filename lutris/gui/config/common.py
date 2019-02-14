@@ -15,7 +15,6 @@ from lutris.gui.widgets.utils import (
     ICON_SIZE,
 )
 from lutris.util.strings import slugify
-from lutris.util import datapath
 from lutris.util import resources
 
 
@@ -440,7 +439,6 @@ class GameDialogCommon:
         self.game.save()
         self.destroy()
         self.saved = True
-        self.game.emit("game-updated")
 
     def on_custom_image_select(self, widget, image_type):
         dialog = Gtk.FileChooserDialog(
@@ -465,12 +463,12 @@ class GameDialogCommon:
             image_path = dialog.get_filename()
             if image_type == "banner":
                 self.game.has_custom_banner = True
-                dest_path = datapath.get_banner_path(self.game.slug)
+                dest_path = resources.get_banner_path(self.game.slug)
                 size = BANNER_SIZE
                 file_format = "jpeg"
             else:
                 self.game.has_custom_icon = True
-                dest_path = datapath.get_icon_path(self.game.slug)
+                dest_path = resources.get_icon_path(self.game.slug)
                 size = ICON_SIZE
                 file_format = "png"
             pixbuf = get_pixbuf(image_path, size)
@@ -478,17 +476,17 @@ class GameDialogCommon:
             self._set_image(image_type)
 
             if image_type == "icon":
-                resources.udpate_desktop_icons()
+                resources.update_desktop_icons()
 
         dialog.destroy()
 
     def on_custom_image_reset_clicked(self, widget, image_type):
         if image_type == "banner":
             self.game.has_custom_banner = False
-            dest_path = datapath.get_banner_path(self.game.slug)
+            dest_path = resources.get_banner_path(self.game.slug)
         elif image_type == "icon":
             self.game.has_custom_icon = False
-            dest_path = datapath.get_icon_path(self.game.slug)
+            dest_path = resources.get_icon_path(self.game.slug)
         else:
             raise ValueError("Unsupported image type %s", image_type)
         os.remove(dest_path)

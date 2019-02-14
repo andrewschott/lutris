@@ -99,6 +99,8 @@ on Linux.
 %endif
 
 %if 0%{?fedora} || 0%{?rhel} || 0%{?centos}
+echo LOOK HERE --- appid --- %{appid}
+echo LOOK HERE --- name --- %{name}
 desktop-file-install --dir=%{buildroot}%{_datadir}/applications share/applications/%{appid}.desktop
 desktop-file-validate %{buildroot}%{_datadir}/applications/%{appid}.desktop
 %endif

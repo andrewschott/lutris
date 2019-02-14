@@ -98,6 +98,8 @@ class LutrisWindow(Gtk.ApplicationWindow):
         self.view = self.get_view(view_type)
 
         GObject.add_emission_hook(Game, "game-updated", self.on_game_updated)
+        GObject.add_emission_hook(Game, "game-removed", self.on_game_updated)
+        GObject.add_emission_hook(Game, "game-installed", self.on_game_installed)
         GObject.add_emission_hook(GenericPanel, "game-searched", self.on_game_searched)
         GObject.add_emission_hook(GenericPanel,
                                   "running-game-selected",
@@ -363,7 +365,7 @@ class LutrisWindow(Gtk.ApplicationWindow):
 
         This must be called each time the view is rebuilt.
         """
-        self.view.connect("game-installed", self.on_game_installed)
+
         self.view.connect("game-selected", self.game_selection_changed)
         self.view.connect("game-activated", self.on_game_activated)
 
@@ -468,8 +470,14 @@ class LutrisWindow(Gtk.ApplicationWindow):
         """Synchronize games with local stuff and server."""
 
         def update_gui(result, error):
+            self.sync_label.set_label("Synchronize library")
+            self.sync_spinner.props.active = False
+            self.sync_button.set_sensitive(True)
             if error:
-                logger.error("Failed to synchrone library: %s", error)
+                if isinstance(error, http.UnauthorizedAccess):
+                    GLib.idle_add(self.show_invalid_credential_warning)
+                else:
+                    GLib.idle_add(self.show_library_sync_error)
                 return
             if result:
                 added_ids, updated_ids = result
@@ -478,9 +486,6 @@ class LutrisWindow(Gtk.ApplicationWindow):
                     self.game_store.update_game_by_id(game_id)
             else:
                 logger.error("No results returned when syncing the library")
-            self.sync_label.set_label("Synchronize library")
-            self.sync_spinner.props.active = False
-            self.sync_button.set_sensitive(True)
 
         self.sync_label.set_label("Synchronizing…")
         self.sync_spinner.props.active = True
@@ -664,6 +669,7 @@ class LutrisWindow(Gtk.ApplicationWindow):
             self.game_store.add_game_by_id(game.id)
 
         self.view.set_selected_game(game.id)
+        self.game_selection_changed(None, game)
         self.sidebar_listbox.update()
         return True
 
@@ -701,10 +707,10 @@ class LutrisWindow(Gtk.ApplicationWindow):
     def on_panel_closed(self, panel):
         self.game_selection_changed(panel, None)
 
-    def on_game_installed(self, view, game_id):
+    def on_game_installed(self, game):
         """Callback to handle newly installed games"""
-        self.game_store.add_or_update(game_id)
-        self.sidebar_listbox.update()
+        self.game_store.add_or_update(game.id)
+        self.game_selection_changed(None, game)
 
     def update_game(self, slug):
         for pga_game in pga.get_games_where(slug=slug):
@@ -719,14 +725,7 @@ class LutrisWindow(Gtk.ApplicationWindow):
 
     def remove_game_from_view(self, game_id, from_library=False):
         """Remove a game from the view"""
-
-        def do_remove_game():
-            self.game_store.remove_game(game_id)
-
-        if from_library:
-            GLib.idle_add(do_remove_game)
-        else:
-            self.game_store.update_game_by_id(game_id)
+        self.game_store.update_game_by_id(game_id)
         self.sidebar_listbox.update()
 
     def on_toggle_viewtype(self, *args):
@@ -798,3 +797,10 @@ class LutrisWindow(Gtk.ApplicationWindow):
         self.game_store.filter_runner = self.selected_runner
         self.game_store.filter_platform = self.selected_platform
         self.invalidate_game_filter()
+
+    def show_invalid_credential_warning(self):
+        dialogs.ErrorDialog("Could not connect to your Lutris account, please sign-in again.")
+
+    def show_library_sync_error(self):
+        dialogs.ErrorDialog("Failed to retrieve game library, "
+                            "there might be some problems contacting lutris.net")
